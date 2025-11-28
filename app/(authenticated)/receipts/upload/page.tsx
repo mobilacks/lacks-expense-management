@@ -12,7 +12,6 @@ export default function UploadReceiptPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,114 +30,33 @@ export default function UploadReceiptPage() {
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      await processFile(files[0], 'file');
+      await uploadFile(files[0], 'file');
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      await processFile(files[0], 'gallery');
+      await uploadFile(files[0], 'gallery');
     }
   };
 
   const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      await processFile(files[0], 'camera');
+      await uploadFile(files[0], 'camera');
     }
-  };
-
-  const processFile = async (file: File, source: string) => {
-    setError(null);
-
-    // Check if it's a PDF
-    if (file.type === 'application/pdf') {
-      setConverting(true);
-      try {
-        // Convert PDF to image in browser
-        const imageFile = await convertPdfToImage(file);
-        await uploadFile(imageFile, source);
-      } catch (err) {
-        console.error('PDF conversion error:', err);
-        setError('Failed to convert PDF. Please save as an image (JPG/PNG) instead.');
-        setConverting(false);
-      }
-    } else {
-      // Regular image file
-      await uploadFile(file, source);
-    }
-  };
-
-  const convertPdfToImage = async (pdfFile: File): Promise<File> => {
-    return new Promise(async (resolve, reject) => {
-      try {
-        // Only import on client-side when actually needed
-        if (typeof window === 'undefined') {
-          reject(new Error('PDF conversion only works in browser'));
-          return;
-        }
-
-        // Dynamically import pdf.js - this will NOT be included in server bundle
-        const pdfjsLib = (await import('pdfjs-dist')).default;
-        
-        // Set worker from CDN
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-
-        // Read PDF file
-        const arrayBuffer = await pdfFile.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-        const pdf = await loadingTask.promise;
-
-        // Get first page
-        const page = await pdf.getPage(1);
-
-        // Create canvas
-        const scale = 2.0; // Higher quality
-        const viewport = page.getViewport({ scale });
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        
-        if (!context) {
-          throw new Error('Could not get canvas context');
-        }
-
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        // Render PDF page to canvas
-        await page.render({
-          canvasContext: context,
-          viewport: viewport,
-        }).promise;
-
-        // Convert canvas to blob
-        const blob = await new Promise<Blob>((blobResolve) => {
-          canvas.toBlob((blob) => {
-            if (blob) blobResolve(blob);
-          }, 'image/png');
-        });
-
-        // Create File from blob
-        const imageFile = new File(
-          [blob], 
-          pdfFile.name.replace('.pdf', '.png'), 
-          { type: 'image/png' }
-        );
-
-        console.log('PDF converted to image:', imageFile.name);
-        resolve(imageFile);
-      } catch (error) {
-        console.error('PDF conversion error:', error);
-        reject(error);
-      }
-    });
   };
 
   const uploadFile = async (file: File, source: string) => {
     setError(null);
-    setConverting(false);
+
+    // Reject PDFs
+    if (file.type === 'application/pdf') {
+      setError('PDF files are not supported. Please save your PDF as an image (JPG or PNG) first.');
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -207,7 +125,7 @@ export default function UploadReceiptPage() {
           Upload Receipt
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Upload a receipt image or PDF and we'll extract the data automatically
+          Upload a receipt image and we'll extract the data automatically
         </p>
       </div>
 
@@ -232,15 +150,7 @@ export default function UploadReceiptPage() {
                 className="object-contain"
               />
             </div>
-            {converting && (
-              <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Converting PDF to image...
-                </p>
-              </div>
-            )}
-            {(uploading || extracting) && !converting && (
+            {(uploading || extracting) && (
               <div className="text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -327,7 +237,7 @@ export default function UploadReceiptPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,application/pdf"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -340,10 +250,20 @@ export default function UploadReceiptPage() {
               className="hidden"
             />
 
-            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Supports: JPEG, PNG, WEBP, PDF</span><br />
-              Max 10MB • PDFs are automatically converted to images
-            </p>
+            <div className="mt-6 space-y-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Supported formats: JPEG, PNG, WEBP
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Maximum file size: 10MB
+              </p>
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  <strong>Have a PDF receipt?</strong> Please save it as a JPG or PNG image first. 
+                  Most PDF viewers have a "Save as Image" or "Export as PNG" option.
+                </p>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -353,7 +273,7 @@ export default function UploadReceiptPage() {
         <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex">
             <svg
-              className="h-5 w-5 text-red-400"
+              className="h-5 w-5 text-red-400 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
