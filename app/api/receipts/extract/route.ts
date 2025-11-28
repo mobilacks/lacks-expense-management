@@ -39,11 +39,8 @@ export async function POST(request: NextRequest) {
 
     console.log('[Extract] Extracting data for receipt:', receiptId);
 
-    // Check if it's a PDF based on URL
-    const isPdf = imageUrl.toLowerCase().includes('.pdf');
-
-    // Call OpenAI Vision API (or PDF extraction)
-    const extractedData = await extractReceiptData(imageUrl, isPdf);
+    // Call OpenAI Vision API
+    const extractedData = await extractReceiptData(imageUrl);
 
     // Create expense record with extracted data
     const { data: expenseData, error: expenseError } = await supabaseAdmin
