@@ -1,7 +1,6 @@
 // lib/openai.ts
 
 import OpenAI from 'openai';
-import pdf from 'pdf-parse';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -21,17 +20,11 @@ export interface ExtractedReceiptData {
 }
 
 export async function extractReceiptData(
-  imageUrl: string,
-  isPdf: boolean = false
+  imageUrl: string
 ): Promise<ExtractedReceiptData> {
   try {
-    console.log('[OpenAI] Extracting data from receipt:', imageUrl, 'isPDF:', isPdf);
+    console.log('[OpenAI] Extracting data from receipt:', imageUrl);
 
-    if (isPdf) {
-      return await extractFromPdf(imageUrl);
-    }
-
-    // For images, use vision API
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -58,74 +51,6 @@ export async function extractReceiptData(
     return parseOpenAIResponse(response.choices[0].message.content);
   } catch (error) {
     console.error('[OpenAI] Error extracting receipt data:', error);
-    return getDefaultExtractedData(error);
-  }
-}
-
-async function extractFromPdf(pdfUrl: string): Promise<ExtractedReceiptData> {
-  try {
-    console.log('[OpenAI] Fetching PDF for text extraction:', pdfUrl);
-
-    // Fetch the PDF
-    const pdfResponse = await fetch(pdfUrl);
-    if (!pdfResponse.ok) {
-      throw new Error(`Failed to fetch PDF: ${pdfResponse.statusText}`);
-    }
-
-    const pdfBuffer = await pdfResponse.arrayBuffer();
-    
-    // Try to extract text from PDF first (for text-based PDFs)
-    console.log('[PDF] Attempting text extraction...');
-    let pdfText = '';
-    
-    try {
-      const pdfData = await pdf(Buffer.from(pdfBuffer));
-      pdfText = pdfData.text.trim();
-      console.log('[PDF] Extracted text length:', pdfText.length);
-    } catch (parseError) {
-      console.warn('[PDF] Text extraction failed:', parseError);
-    }
-
-    // If we got meaningful text, use it
-    if (pdfText && pdfText.length > 50) {
-      console.log('[PDF] Using text-based extraction');
-      console.log('[PDF] First 500 chars:', pdfText.substring(0, 500));
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: `You are analyzing text extracted from a PDF receipt/invoice. Here is the text:
-
-${pdfText}
-
-${getExtractionPrompt()}`,
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.1,
-      });
-
-      return parseOpenAIResponse(response.choices[0].message.content);
-    }
-
-    // If no text or very little text, it's likely a scanned PDF
-    // Tell user to use image format instead
-    console.warn('[PDF] No text found - likely a scanned PDF');
-    
-    return {
-      vendor: 'Unknown Vendor',
-      date: new Date().toISOString().split('T')[0],
-      total: 0,
-      currency: 'USD',
-      line_items: [],
-      confidence: 0,
-      raw_text: 'This appears to be a scanned PDF. Please upload as an image (JPG/PNG) instead for better results.',
-    };
-
-  } catch (error) {
-    console.error('[OpenAI] Error extracting from PDF:', error);
     return getDefaultExtractedData(error);
   }
 }
