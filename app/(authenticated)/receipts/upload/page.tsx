@@ -244,7 +244,10 @@ export default function UploadReceiptPage() {
             />
 
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Supports: JPEG, PNG, WEBP, PDF (Max 10MB)
+              Supports: JPEG, PNG, WEBP, PDF (Max 10MB)<br />
+              <span className="text-yellow-600 dark:text-yellow-400">
+                Note: For scanned receipts, please upload as an image (JPG/PNG) for best results
+              </span>
             </p>
           </>
         )}
