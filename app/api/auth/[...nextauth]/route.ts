@@ -63,7 +63,7 @@ const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.userId as string
-        session.user.role = token.role as string
+        session.user.role = token.role as 'user' | 'accounting' | 'admin'
         session.user.departmentId = token.departmentId as string
       }
       return session
