@@ -42,7 +42,7 @@ export default async function DashboardPage() {
               </span>
               <Link
                 href="/api/auth/signout"
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-colors"
               >
                 Sign Out
               </Link>
@@ -58,13 +58,13 @@ export default async function DashboardPage() {
             🔍 Debug Info (Remove this after fixing):
           </h3>
           <pre className="text-xs text-yellow-900 dark:text-yellow-100 overflow-auto">
-            {JSON.stringify({
-              email: session.user?.email,
-              name: session.user?.name,
-              role: session.user?.role,
-              id: session.user?.id,
-              department_id: session.user?.department_id,
-            }, null, 2)}
+{JSON.stringify({
+  email: session.user?.email,
+  name: session.user?.name,
+  role: session.user?.role,
+  id: session.user?.id,
+  department_id: session.user?.department_id,
+}, null, 2)}
           </pre>
         </div>
       </div>
