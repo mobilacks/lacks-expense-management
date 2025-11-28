@@ -12,6 +12,7 @@ export default function UploadReceiptPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,26 +31,106 @@ export default function UploadReceiptPage() {
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      await uploadFile(files[0], 'file');
+      await processFile(files[0], 'file');
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      await uploadFile(files[0], 'gallery');
+      await processFile(files[0], 'gallery');
     }
   };
 
   const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      await uploadFile(files[0], 'camera');
+      await processFile(files[0], 'camera');
     }
+  };
+
+  const processFile = async (file: File, source: string) => {
+    setError(null);
+
+    // Check if it's a PDF
+    if (file.type === 'application/pdf') {
+      setConverting(true);
+      try {
+        // Convert PDF to image in browser
+        const imageFile = await convertPdfToImage(file);
+        await uploadFile(imageFile, source);
+      } catch (err) {
+        console.error('PDF conversion error:', err);
+        setError('Failed to convert PDF. Please save as an image (JPG/PNG) instead.');
+        setConverting(false);
+      }
+    } else {
+      // Regular image file
+      await uploadFile(file, source);
+    }
+  };
+
+  const convertPdfToImage = async (pdfFile: File): Promise<File> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Dynamically import pdf.js (only loads when needed)
+        const pdfjsLib = await import('pdfjs-dist');
+        
+        // Set worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+        // Read PDF file
+        const arrayBuffer = await pdfFile.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+        // Get first page
+        const page = await pdf.getPage(1);
+
+        // Create canvas
+        const scale = 2.0; // Higher quality
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        if (!context) {
+          throw new Error('Could not get canvas context');
+        }
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        // Render PDF page to canvas
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+        }).promise;
+
+        // Convert canvas to blob
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+          }, 'image/png');
+        });
+
+        // Create File from blob
+        const imageFile = new File(
+          [blob], 
+          pdfFile.name.replace('.pdf', '.png'), 
+          { type: 'image/png' }
+        );
+
+        console.log('PDF converted to image:', imageFile.name);
+        resolve(imageFile);
+      } catch (error) {
+        reject(error);
+      }
+    });
   };
 
   const uploadFile = async (file: File, source: string) => {
     setError(null);
+    setConverting(false);
     setUploading(true);
 
     try {
@@ -118,7 +199,7 @@ export default function UploadReceiptPage() {
           Upload Receipt
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Upload a receipt image and we'll extract the data automatically
+          Upload a receipt image or PDF and we'll extract the data automatically
         </p>
       </div>
 
@@ -143,7 +224,15 @@ export default function UploadReceiptPage() {
                 className="object-contain"
               />
             </div>
-            {(uploading || extracting) && (
+            {converting && (
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Converting PDF to image...
+                </p>
+              </div>
+            )}
+            {(uploading || extracting) && !converting && (
               <div className="text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -244,11 +333,8 @@ export default function UploadReceiptPage() {
             />
 
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Recommended: JPEG, PNG, WEBP</span><br />
-              PDF supported (text-based only - max 10MB)<br />
-              <span className="text-amber-600 dark:text-amber-400">
-                💡 Tip: For scanned receipts, save as JPG/PNG for best results
-              </span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Supports: JPEG, PNG, WEBP, PDF</span><br />
+              Max 10MB • PDFs are automatically converted to images
             </p>
           </>
         )}
