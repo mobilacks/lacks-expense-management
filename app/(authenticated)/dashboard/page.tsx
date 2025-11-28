@@ -47,9 +47,12 @@ export default async function DashboardPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Upload a new receipt and extract data with AI
           </p>
-          <button className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+          <Link
+            href="/receipts/upload"
+            className="block w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-center"
+          >
             Upload Receipt
-          </button>
+          </Link>
         </div>
 
         {/* My Reports */}
