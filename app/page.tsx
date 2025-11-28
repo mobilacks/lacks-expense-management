@@ -1,5 +1,3 @@
-// app/page.tsx
-
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
@@ -39,16 +37,6 @@ export default async function HomePage() {
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center">
-          {/* Bismillah */}
-          <div className="mb-8">
-            <p className="text-3xl font-arabic text-gray-700 dark:text-gray-300 mb-2">
-              بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              In the name of Allah, the Most Gracious, the Most Merciful
-            </p>
-          </div>
-
           {/* Main Heading */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6">
             Streamline Your Expense Reporting
