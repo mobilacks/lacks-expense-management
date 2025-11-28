@@ -25,7 +25,7 @@ const handler = NextAuth({
         // Check if user exists in Supabase
         const { data: existingUser, error } = await supabase
           .from('users')
-          .select('id, email, name, role, is_active, department_id')
+          .select('id, email, name, role, is_active, department_id, entra_id')
           .eq('email', user.email.toLowerCase())
           .single();
 
