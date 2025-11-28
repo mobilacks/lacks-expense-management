@@ -6,9 +6,16 @@ import { authOptions } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
-const supabase = createClient(
+// Use service role client for storage operations (bypasses RLS)
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 export async function POST(request: NextRequest) {
@@ -76,8 +83,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase
+    // Upload to Supabase Storage using admin client
+    const { data: uploadData, error: uploadError } = await supabaseAdmin
       .storage
       .from('receipts')
       .upload(filePath, buffer, {
@@ -96,7 +103,7 @@ export async function POST(request: NextRequest) {
     console.log('[Upload] ✅ File uploaded:', uploadData.path);
 
     // Get public URL for the image
-    const { data: urlData } = supabase
+    const { data: urlData } = supabaseAdmin
       .storage
       .from('receipts')
       .getPublicUrl(filePath);
@@ -104,12 +111,12 @@ export async function POST(request: NextRequest) {
     const imageUrl = urlData.publicUrl;
 
     // Create receipt record in database
-    const { data: receiptData, error: receiptError } = await supabase
+    const { data: receiptData, error: receiptError } = await supabaseAdmin
       .from('receipts')
       .insert({
         id: receiptId,
         user_id: userId,
-        image_url: filePath, // Store the path, not full URL
+        image_url: filePath,
         status: 'draft',
         upload_source: uploadSource,
       })
@@ -120,7 +127,7 @@ export async function POST(request: NextRequest) {
       console.error('[Upload] Error creating receipt record:', receiptError);
       
       // Clean up uploaded file
-      await supabase.storage.from('receipts').remove([filePath]);
+      await supabaseAdmin.storage.from('receipts').remove([filePath]);
       
       return NextResponse.json(
         { error: 'Failed to create receipt record', details: receiptError.message },
