@@ -17,8 +17,10 @@ export default async function Dashboard() {
     redirect('/auth/signin');
   }
 
-  // TODO: Get actual user role from session
-  const userRole = 'admin'; // This should come from session.user.role
+  // Get user role from session (now properly set by NextAuth)
+  const userRole = session.user?.role || 'user';
+  const isAdmin = userRole === 'admin';
+  const isAccounting = userRole === 'accounting' || userRole === 'admin';
 
   const dashboardCards = [
     {
@@ -55,18 +57,41 @@ export default async function Dashboard() {
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Manage your expenses and track your spending
           </p>
+          {/* Show role badge */}
+          <div className="mt-2">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              userRole === 'admin'
+                ? 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
+                : userRole === 'accounting'
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+            }`}>
+              {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+            </span>
+          </div>
         </div>
 
-        {/* Admin Panel Button - Only show for admins */}
-        {userRole === 'admin' && (
-          <div className="mb-8">
-            <Link
-              href="/admin"
-              className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
-            >
-              <Settings className="w-5 h-5 mr-2" />
-              Admin Panel
-            </Link>
+        {/* Admin/Accounting Quick Access */}
+        {(isAdmin || isAccounting) && (
+          <div className="mb-8 flex flex-wrap gap-4">
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <Settings className="w-5 h-5 mr-2" />
+                Admin Panel
+              </Link>
+            )}
+            {isAccounting && (
+              <Link
+                href="/accounting"
+                className="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                <FileText className="w-5 h-5 mr-2" />
+                Review Reports
+              </Link>
+            )}
           </div>
         )}
 
