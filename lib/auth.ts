@@ -18,83 +18,89 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       if (!user.email) {
-        console.error('No email provided');
+        console.error('[AUTH] No email provided');
         return false;
       }
 
       try {
-        // Check if user exists in Supabase
+        console.log('[AUTH] Checking user in database:', user.email);
+        
         const { data: existingUser, error } = await supabase
           .from('users')
-          .select('id, email, name, role, department_id, is_active, entra_id')
+          .select('*')
           .eq('email', user.email)
           .single();
 
         if (error || !existingUser) {
-          console.error('User not found in database:', user.email, error);
+          console.error('[AUTH] User not found:', user.email, error);
           return false;
         }
 
-        // Check if user is active
+        console.log('[AUTH] User found in DB:', {
+          email: existingUser.email,
+          role: existingUser.role,
+          is_active: existingUser.is_active
+        });
+
         if (!existingUser.is_active) {
-          console.error('User is inactive:', user.email);
+          console.error('[AUTH] User is inactive:', user.email);
           return false;
         }
 
         // Update entra_id if not set
         if (!existingUser.entra_id && account?.providerAccountId) {
-          const { error: updateError } = await supabase
+          await supabase
             .from('users')
             .update({ 
               entra_id: account.providerAccountId,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingUser.id);
-
-          if (updateError) {
-            console.error('Error updating entra_id:', updateError);
-          }
         }
-
-        console.log('User signed in successfully:', {
-          email: existingUser.email,
-          role: existingUser.role,
-          id: existingUser.id
-        });
 
         return true;
       } catch (error) {
-        console.error('Error during sign in:', error);
+        console.error('[AUTH] Error during sign in:', error);
         return false;
       }
     },
-    async jwt({ token, user, account, trigger }) {
-      // On sign in or when session is updated
+    
+    async jwt({ token, user, trigger }) {
+      console.log('[JWT] Callback triggered:', { trigger, hasUser: !!user, email: token.email });
+      
+      // Always fetch fresh data from database on sign in or update
       if (user?.email || trigger === 'update') {
         const email = user?.email || token.email;
         
-        if (!email) return token;
+        if (!email) {
+          console.error('[JWT] No email available');
+          return token;
+        }
+
+        console.log('[JWT] Fetching user data from DB for:', email);
 
         const { data: dbUser, error } = await supabase
           .from('users')
           .select('id, email, name, role, department_id')
-          .eq('email', email)
+          .eq('email', email as string)
           .single();
 
         if (error) {
-          console.error('Error fetching user in jwt callback:', error);
+          console.error('[JWT] Error fetching user:', error);
           return token;
         }
 
         if (dbUser) {
-          console.log('JWT callback - User data from DB:', {
+          console.log('[JWT] ✅ Fresh data from DB:', {
+            id: dbUser.id,
             email: dbUser.email,
             role: dbUser.role,
-            id: dbUser.id
+            department_id: dbUser.department_id
           });
 
+          // Store in token
           token.id = dbUser.id;
           token.email = dbUser.email;
           token.name = dbUser.name;
@@ -103,35 +109,21 @@ export const authOptions: NextAuthOptions = {
         }
       }
       
+      console.log('[JWT] Final token:', {
+        id: token.id,
+        email: token.email,
+        role: token.role
+      });
+      
       return token;
     },
+    
     async session({ session, token }) {
-      if (session.user && token) {
-        console.log('Session callback - Token data:', {
-          email: token.email,
-          role: token.role,
-          id: token.id
-        });
+      console.log('[SESSION] Building session from token:', {
+        tokenRole: token.role,
+        tokenId: token.id,
+        tokenEmail: token.email
+      });
 
+      if (session.user) {
         session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.role = token.role as string;
-        session.user.department_id = token.department_id as string;
-
-        console.log('Session callback - Final session.user:', {
-          email: session.user.email,
-          role: session.user.role,
-          id: session.user.id
-        });
-      }
-      
-      return session;
-    },
-  },
-  pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
-  },
-  debug: true, // Enable debug mode to see console logs
-};
