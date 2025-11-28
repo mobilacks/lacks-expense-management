@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth';
+import NextAuth, { NextAuthOptions } from 'next-auth';
 import AzureADProvider from 'next-auth/providers/azure-ad';
 import { createClient } from '@supabase/supabase-js';
 
@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     AzureADProvider({
       clientId: process.env.AZURE_AD_CLIENT_ID!,
@@ -17,26 +17,24 @@ const handler = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if (!user.email) {
-        return false;
-      }
+      if (!user.email) return false;
 
       try {
         // Check if user exists in Supabase
         const { data: existingUser, error } = await supabase
           .from('users')
-          .select('id, email, name, role, is_active, department_id, entra_id')
-          .eq('email', user.email.toLowerCase())
+          .select('*')
+          .eq('email', user.email)
           .single();
 
         if (error || !existingUser) {
-          console.log('User not found in database:', user.email);
+          console.error('User not found in database:', user.email);
           return false;
         }
 
         // Check if user is active
         if (!existingUser.is_active) {
-          console.log('User is inactive:', user.email);
+          console.error('User is inactive:', user.email);
           return false;
         }
 
@@ -54,43 +52,29 @@ const handler = NextAuth({
         return false;
       }
     },
-
     async jwt({ token, user, account }) {
       // Initial sign in
-      if (user && user.email) {
-        try {
-          // Fetch user data from Supabase
-          const { data: dbUser, error } = await supabase
-            .from('users')
-            .select('id, email, name, role, is_active, department_id')
-            .eq('email', user.email.toLowerCase())
-            .single();
+      if (user?.email) {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('id, email, name, role, department_id')
+          .eq('email', user.email)
+          .single();
 
-          if (dbUser && !error) {
-            token.id = dbUser.id;
-            token.role = dbUser.role;
-            token.department_id = dbUser.department_id;
-            token.email = dbUser.email;
-            token.name = dbUser.name;
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+          token.department_id = dbUser.department_id;
         }
       }
-
       return token;
     },
-
     async session({ session, token }) {
-      // Add custom fields to session
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.department_id = token.department_id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
       }
-
       return session;
     },
   },
@@ -98,6 +82,8 @@ const handler = NextAuth({
     signIn: '/auth/signin',
     error: '/auth/error',
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
