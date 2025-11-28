@@ -1,118 +1,149 @@
-'use client'
+import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  Receipt, 
+  FileText, 
+  TrendingUp, 
+  Settings,
+  DollarSign,
+  Calendar
+} from 'lucide-react';
 
-import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-
-export default function Dashboard() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-    }
-  }, [status, router])
-
-  if (status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    )
-  }
-
+export default async function Dashboard() {
+  const session = await getServerSession();
+  
   if (!session) {
-    return null
+    redirect('/auth/signin');
   }
+
+  // TODO: Get actual user role from session
+  const userRole = 'admin'; // This should come from session.user.role
+
+  const dashboardCards = [
+    {
+      title: 'Upload Receipt',
+      description: 'Snap a photo or upload a receipt image',
+      icon: Receipt,
+      href: '/receipts/upload',
+      color: 'bg-blue-500 dark:bg-blue-600',
+    },
+    {
+      title: 'My Reports',
+      description: 'View and manage your expense reports',
+      icon: FileText,
+      href: '/reports',
+      color: 'bg-green-500 dark:bg-green-600',
+    },
+    {
+      title: 'Analytics',
+      description: 'Track your spending trends',
+      icon: TrendingUp,
+      href: '/analytics',
+      color: 'bg-purple-500 dark:bg-purple-600',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Lacks Expense Management
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Welcome back, {session.user?.name || 'User'}!
           </h1>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{session.user?.name}</p>
-              <p className="text-xs text-gray-500">{session.user?.role}</p>
-            </div>
-            <button
-              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Manage your expenses and track your spending
+          </p>
+        </div>
+
+        {/* Admin Panel Button - Only show for admins */}
+        {userRole === 'admin' && (
+          <div className="mb-8">
+            <Link
+              href="/admin"
+              className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
             >
-              Sign Out
-            </button>
+              <Settings className="w-5 h-5 mr-2" />
+              Admin Panel
+            </Link>
           </div>
-        </div>
-      </header>
+        )}
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="text-2xl font-semibold mb-4">Welcome back, {session.user?.name}!</h2>
+        {/* Dashboard Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {dashboardCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="group bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-200 dark:border-gray-700"
+              >
+                <div className="p-6">
+                  <div className={`${card.color} w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {card.description}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Pending Reports</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">--</div>
+              </div>
+              <FileText className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">Connect to view data</div>
+          </div>
           
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mt-8">
-            {/* Quick Stats */}
-            <div className="rounded-lg border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-500">Total Expenses</h3>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">$0.00</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">This Month</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">$--</div>
+              </div>
+              <DollarSign className="w-8 h-8 text-gray-400 dark:text-gray-500" />
             </div>
-            
-            <div className="rounded-lg border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-500">Pending Reports</h3>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">0</p>
-            </div>
-            
-            <div className="rounded-lg border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-500">This Month</h3>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">$0.00</p>
-            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">Total expenses</div>
           </div>
-
-          {/* Quick Actions */}
-          <div className="mt-8">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <button className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50">
-                <p className="font-medium text-gray-900">Upload Receipt</p>
-              </button>
-              
-              <button className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50">
-                <p className="font-medium text-gray-900">New Expense Report</p>
-              </button>
-              
-              <button className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50">
-                <p className="font-medium text-gray-900">View Reports</p>
-              </button>
-              
-              {session.user?.role === 'admin' && (
-                <button className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center hover:border-blue-500 hover:bg-blue-50">
-                  <p className="font-medium text-gray-900">Admin Panel</p>
-                </button>
-              )}
+          
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Last Submission</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">--</div>
+              </div>
+              <Calendar className="w-8 h-8 text-gray-400 dark:text-gray-500" />
             </div>
-          </div>
-
-          {/* Coming Soon */}
-          <div className="mt-8 rounded-lg bg-blue-50 p-6">
-            <h3 className="text-lg font-semibold text-blue-900">🚧 Under Construction</h3>
-            <p className="mt-2 text-sm text-blue-700">
-              We're building out the expense management features. Check back soon!
-            </p>
-            <ul className="mt-4 space-y-2 text-sm text-blue-700">
-              <li>✅ Office 365 SSO Authentication</li>
-              <li>✅ User Dashboard</li>
-              <li>🔨 Receipt Upload & AI Extraction</li>
-              <li>🔨 Expense Report Creation</li>
-              <li>🔨 Accounting Review Portal</li>
-              <li>🔨 Admin Panel</li>
-            </ul>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">Days ago</div>
           </div>
         </div>
-      </main>
+
+        {/* Recent Activity */}
+        <div className="mt-8">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+            Recent Activity
+          </h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+              No recent activity. Upload your first receipt to get started!
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
