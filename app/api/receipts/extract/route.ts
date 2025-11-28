@@ -6,9 +6,16 @@ import { authOptions } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import { extractReceiptData } from '@/lib/openai';
 
-const supabase = createClient(
+// Use service role client
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 export async function POST(request: NextRequest) {
@@ -37,7 +44,7 @@ export async function POST(request: NextRequest) {
     const extractedData = await extractReceiptData(imageUrl);
 
     // Create expense record with extracted data
-    const { data: expenseData, error: expenseError } = await supabase
+    const { data: expenseData, error: expenseError } = await supabaseAdmin
       .from('expenses')
       .insert({
         receipt_id: receiptId,
@@ -45,7 +52,7 @@ export async function POST(request: NextRequest) {
         amount: extractedData.total,
         currency: extractedData.currency,
         expense_date: extractedData.date,
-        extracted_data: extractedData, // Store full JSON
+        extracted_data: extractedData,
         is_edited: false,
       })
       .select()
