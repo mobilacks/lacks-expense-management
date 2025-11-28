@@ -10,7 +10,7 @@ const supabase = createClient(
 // PATCH - Update category
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession();
@@ -19,6 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const categoryId = params.id;
     const body = await request.json();
     const { name, description, is_active } = body;
