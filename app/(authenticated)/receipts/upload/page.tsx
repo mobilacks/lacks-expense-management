@@ -73,15 +73,22 @@ export default function UploadReceiptPage() {
   const convertPdfToImage = async (pdfFile: File): Promise<File> => {
     return new Promise(async (resolve, reject) => {
       try {
-        // Dynamically import pdf.js (only loads when needed)
-        const pdfjsLib = await import('pdfjs-dist');
+        // Only import on client-side when actually needed
+        if (typeof window === 'undefined') {
+          reject(new Error('PDF conversion only works in browser'));
+          return;
+        }
+
+        // Dynamically import pdf.js - this will NOT be included in server bundle
+        const pdfjsLib = (await import('pdfjs-dist')).default;
         
-        // Set worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        // Set worker from CDN
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
         // Read PDF file
         const arrayBuffer = await pdfFile.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
 
         // Get first page
         const page = await pdf.getPage(1);
@@ -107,9 +114,9 @@ export default function UploadReceiptPage() {
         }).promise;
 
         // Convert canvas to blob
-        const blob = await new Promise<Blob>((resolve) => {
+        const blob = await new Promise<Blob>((blobResolve) => {
           canvas.toBlob((blob) => {
-            if (blob) resolve(blob);
+            if (blob) blobResolve(blob);
           }, 'image/png');
         });
 
@@ -123,6 +130,7 @@ export default function UploadReceiptPage() {
         console.log('PDF converted to image:', imageFile.name);
         resolve(imageFile);
       } catch (error) {
+        console.error('PDF conversion error:', error);
         reject(error);
       }
     });
