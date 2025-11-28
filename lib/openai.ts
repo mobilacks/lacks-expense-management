@@ -20,11 +20,18 @@ export interface ExtractedReceiptData {
 }
 
 export async function extractReceiptData(
-  imageUrl: string
+  imageUrl: string,
+  isPdf: boolean = false
 ): Promise<ExtractedReceiptData> {
   try {
-    console.log('[OpenAI] Extracting data from receipt:', imageUrl);
+    console.log('[OpenAI] Extracting data from receipt:', imageUrl, 'isPDF:', isPdf);
 
+    // For PDFs, we need to use a different approach
+    if (isPdf) {
+      return await extractFromPdfUrl(imageUrl);
+    }
+
+    // For images, use vision API
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -104,21 +111,8 @@ If you cannot find specific information:
 
     console.log('[OpenAI] Raw response:', content);
 
-    // Clean up the response - remove markdown code blocks if present
-    content = content.trim();
-    
-    // Remove ```json and ``` markers
-    if (content.startsWith('```json')) {
-      content = content.replace(/^```json\s*\n?/, '');
-    }
-    if (content.startsWith('```')) {
-      content = content.replace(/^```\s*\n?/, '');
-    }
-    if (content.endsWith('```')) {
-      content = content.replace(/\n?```\s*$/, '');
-    }
-    
-    content = content.trim();
+    // Clean up the response
+    content = cleanJsonResponse(content);
 
     console.log('[OpenAI] Cleaned response:', content);
 
@@ -142,4 +136,119 @@ If you cannot find specific information:
       raw_text: error instanceof Error ? error.message : 'Error extracting data',
     };
   }
+}
+
+async function extractFromPdfUrl(pdfUrl: string): Promise<ExtractedReceiptData> {
+  try {
+    console.log('[OpenAI] Fetching PDF for text extraction:', pdfUrl);
+
+    // Fetch the PDF
+    const pdfResponse = await fetch(pdfUrl);
+    const pdfBuffer = await pdfResponse.arrayBuffer();
+    
+    // Convert to base64
+    const base64Pdf = Buffer.from(pdfBuffer).toString('base64');
+
+    // Use GPT-4 with text to extract from PDF
+    // Note: We'll send it as a data URL
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `You are analyzing a PDF receipt/invoice. Extract the following information:
+
+VENDOR IDENTIFICATION RULES:
+- If you see "Amazon.com", "amazon.com", or references to Amazon → vendor is "Amazon"
+- If you see "Walmart" → vendor is "Walmart"
+- If you see "Target" → vendor is "Target"
+- For other receipts, use the main merchant name
+- Ignore third-party sellers if it's clearly a marketplace order
+
+DATE EXTRACTION RULES:
+- Look for "Order Date", "Purchase Date", "Transaction Date", or "Date Placed"
+- DO NOT use "Delivery Date", "Shipped Date", or "Expected Arrival"
+- Format as YYYY-MM-DD
+
+AMOUNT EXTRACTION RULES:
+- Look for "Grand Total", "Total", "Amount Paid", or "Order Total"
+- Include tax in the final amount
+
+Return ONLY valid JSON (no markdown, no code blocks):
+{
+  "vendor": "Amazon",
+  "date": "2025-11-14",
+  "total": 97.41,
+  "currency": "USD",
+  "line_items": [
+    {"description": "Product name", "amount": 89.99}
+  ],
+  "confidence": 0.95
+}`,
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:application/pdf;base64,${base64Pdf}`,
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 1000,
+      temperature: 0.1,
+    });
+
+    let content = response.choices[0].message.content;
+    
+    if (!content) {
+      throw new Error('No content returned from OpenAI for PDF');
+    }
+
+    console.log('[OpenAI] PDF Raw response:', content);
+
+    // Clean up the response
+    content = cleanJsonResponse(content);
+
+    console.log('[OpenAI] PDF Cleaned response:', content);
+
+    // Parse the JSON response
+    const extracted = JSON.parse(content) as ExtractedReceiptData;
+
+    console.log('[OpenAI] ✅ PDF Extracted data:', extracted);
+
+    return extracted;
+  } catch (error) {
+    console.error('[OpenAI] Error extracting from PDF:', error);
+    
+    return {
+      vendor: 'Unknown Vendor',
+      date: new Date().toISOString().split('T')[0],
+      total: 0,
+      currency: 'USD',
+      line_items: [],
+      confidence: 0,
+      raw_text: error instanceof Error ? error.message : 'Error extracting PDF data',
+    };
+  }
+}
+
+function cleanJsonResponse(content: string): string {
+  content = content.trim();
+  
+  // Remove ```json and ``` markers
+  if (content.startsWith('```json')) {
+    content = content.replace(/^```json\s*\n?/, '');
+  }
+  if (content.startsWith('```')) {
+    content = content.replace(/^```\s*\n?/, '');
+  }
+  if (content.endsWith('```')) {
+    content = content.replace(/\n?```\s*$/, '');
+  }
+  
+  return content.trim();
 }
