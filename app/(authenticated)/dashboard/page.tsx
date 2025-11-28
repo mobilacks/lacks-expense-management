@@ -22,24 +22,6 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* DEBUG INFO - TEMPORARY */}
-      <div className="mb-8">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-            🔍 Debug Info (Remove this after fixing):
-          </h3>
-          <pre className="text-xs text-yellow-900 dark:text-yellow-100 overflow-auto">
-{JSON.stringify({
-  email: session?.user?.email,
-  name: session?.user?.name,
-  role: session?.user?.role,
-  id: session?.user?.id,
-  department_id: session?.user?.department_id,
-}, null, 2)}
-          </pre>
-        </div>
-      </div>
-
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Upload Receipt */}
