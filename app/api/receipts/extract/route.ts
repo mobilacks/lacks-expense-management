@@ -6,7 +6,6 @@ import { authOptions } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import { extractReceiptData } from '@/lib/openai';
 
-// Use service role client
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -40,8 +39,11 @@ export async function POST(request: NextRequest) {
 
     console.log('[Extract] Extracting data for receipt:', receiptId);
 
-    // Call OpenAI Vision API
-    const extractedData = await extractReceiptData(imageUrl);
+    // Check if it's a PDF based on URL
+    const isPdf = imageUrl.toLowerCase().includes('.pdf');
+
+    // Call OpenAI Vision API (or PDF extraction)
+    const extractedData = await extractReceiptData(imageUrl, isPdf);
 
     // Create expense record with extracted data
     const { data: expenseData, error: expenseError } = await supabaseAdmin
