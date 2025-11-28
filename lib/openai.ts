@@ -33,39 +33,55 @@ export async function extractReceiptData(
           content: [
             {
               type: 'text',
-              text: `You are a receipt data extraction assistant. Analyze this receipt image and extract the following information:
+              text: `You are a receipt data extraction assistant. Analyze this receipt/invoice image and extract the following information:
 
-1. Vendor/Merchant name (the store or company name)
+1. Vendor/Merchant name (the PRIMARY merchant/platform)
 2. Purchase date (the date the transaction occurred, NOT delivery date)
-3. Total amount paid (the final total)
+3. Total amount paid (the final total after all taxes and fees)
 4. Currency (e.g., USD, EUR)
 5. Individual line items with descriptions and prices
 
+VENDOR IDENTIFICATION RULES:
+- If you see an "Amazon" logo, smile logo, or "Amazon.com" anywhere → vendor is "Amazon"
+- If you see "Walmart" logo or branding → vendor is "Walmart"
+- If you see "Target" logo or branding → vendor is "Target"
+- For other receipts, use the main merchant name at the top
+- Ignore third-party sellers (like "NGS Inc.") if it's clearly an Amazon/Walmart/etc order
+
+DATE EXTRACTION RULES:
+- Look for "Order Date", "Purchase Date", "Transaction Date", or "Date Placed"
+- DO NOT use "Delivery Date", "Shipped Date", or "Expected Arrival"
+- Format as YYYY-MM-DD
+
+AMOUNT EXTRACTION RULES:
+- Look for "Grand Total", "Total", "Amount Paid", or "Order Total"
+- This should be the final amount INCLUDING tax
+- DO NOT use subtotal or pre-tax amounts
+
 IMPORTANT INSTRUCTIONS:
-- Look for the PURCHASE DATE or TRANSACTION DATE, NOT the delivery date
-- Extract the GRAND TOTAL or FINAL TOTAL amount
 - Return ONLY valid JSON, no markdown formatting, no code blocks
 - Do not wrap the JSON in backticks or \`\`\`json blocks
+- Be as accurate as possible
 
 Return a JSON object with this exact structure:
 {
-  "vendor": "store name here",
-  "date": "YYYY-MM-DD",
-  "total": 0.00,
+  "vendor": "Amazon",
+  "date": "2025-11-14",
+  "total": 97.41,
   "currency": "USD",
   "line_items": [
-    {"description": "item name", "amount": 0.00}
+    {"description": "Product name", "amount": 89.99}
   ],
   "confidence": 0.95
 }
 
 If you cannot find specific information:
-- vendor: Use the merchant/store name if visible, otherwise "Unknown Vendor"
-- date: Use the purchase/transaction date if visible, otherwise use today's date
-- total: The final amount paid (after tax)
-- currency: Default to "USD" if not visible
-- line_items: Extract visible items, or empty array if none visible
-- confidence: Your confidence level from 0 to 1`,
+- vendor: Use recognizable merchant name, otherwise "Unknown Vendor"
+- date: Use purchase date if visible, otherwise today's date
+- total: The final amount paid
+- currency: Default to "USD" if not specified
+- line_items: Extract visible items with their prices
+- confidence: Your confidence level from 0 to 1 (be honest!)`,
             },
             {
               type: 'image_url',
@@ -77,7 +93,7 @@ If you cannot find specific information:
         },
       ],
       max_tokens: 1000,
-      temperature: 0.1, // Lower temperature for more consistent output
+      temperature: 0.1,
     });
 
     let content = response.choices[0].message.content;
