@@ -127,3 +127,29 @@ export const authOptions: NextAuthOptions = {
 
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+        session.user.role = token.role as string;
+        session.user.department_id = token.department_id as string;
+
+        console.log('[SESSION] ✅ Final session.user:', {
+          id: session.user.id,
+          email: session.user.email,
+          role: session.user.role,
+          department_id: session.user.department_id
+        });
+      }
+      
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/auth/signin',
+    error: '/auth/error',
+  },
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  debug: true,
+};
