@@ -74,36 +74,56 @@ async function extractFromPdf(pdfUrl: string): Promise<ExtractedReceiptData> {
 
     const pdfBuffer = await pdfResponse.arrayBuffer();
     
-    // Extract text from PDF
-    console.log('[PDF] Parsing PDF text...');
-    const pdfData = await pdf(Buffer.from(pdfBuffer));
-    const pdfText = pdfData.text;
-
-    console.log('[PDF] Extracted text length:', pdfText.length);
-    console.log('[PDF] First 500 chars:', pdfText.substring(0, 500));
-
-    if (!pdfText || pdfText.trim().length === 0) {
-      throw new Error('No text could be extracted from PDF');
+    // Try to extract text from PDF first (for text-based PDFs)
+    console.log('[PDF] Attempting text extraction...');
+    let pdfText = '';
+    
+    try {
+      const pdfData = await pdf(Buffer.from(pdfBuffer));
+      pdfText = pdfData.text.trim();
+      console.log('[PDF] Extracted text length:', pdfText.length);
+    } catch (parseError) {
+      console.warn('[PDF] Text extraction failed:', parseError);
     }
 
-    // Send extracted text to GPT-4 for structuring
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: `You are analyzing text extracted from a PDF receipt/invoice. Here is the text:
+    // If we got meaningful text, use it
+    if (pdfText && pdfText.length > 50) {
+      console.log('[PDF] Using text-based extraction');
+      console.log('[PDF] First 500 chars:', pdfText.substring(0, 500));
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: `You are analyzing text extracted from a PDF receipt/invoice. Here is the text:
 
 ${pdfText}
 
 ${getExtractionPrompt()}`,
-        },
-      ],
-      max_tokens: 1000,
-      temperature: 0.1,
-    });
+          },
+        ],
+        max_tokens: 1000,
+        temperature: 0.1,
+      });
 
-    return parseOpenAIResponse(response.choices[0].message.content);
+      return parseOpenAIResponse(response.choices[0].message.content);
+    }
+
+    // If no text or very little text, it's likely a scanned PDF
+    // Tell user to use image format instead
+    console.warn('[PDF] No text found - likely a scanned PDF');
+    
+    return {
+      vendor: 'Unknown Vendor',
+      date: new Date().toISOString().split('T')[0],
+      total: 0,
+      currency: 'USD',
+      line_items: [],
+      confidence: 0,
+      raw_text: 'This appears to be a scanned PDF. Please upload as an image (JPG/PNG) instead for better results.',
+    };
+
   } catch (error) {
     console.error('[OpenAI] Error extracting from PDF:', error);
     return getDefaultExtractedData(error);
