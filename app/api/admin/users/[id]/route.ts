@@ -10,7 +10,7 @@ const supabase = createClient(
 // PATCH - Update user
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession();
@@ -19,6 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const userId = params.id;
     const body = await request.json();
     const { name, email, role, department_id, is_active } = body;
@@ -74,7 +75,7 @@ export async function PATCH(
 // DELETE - Soft delete user
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession();
@@ -83,6 +84,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const userId = params.id;
 
     const { data: deletedUser, error } = await supabase
