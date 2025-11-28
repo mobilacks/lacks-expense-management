@@ -1,7 +1,9 @@
+// app/page.tsx
+
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { authOptions } from './api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 
 export default async function HomePage() {
   // If user is already logged in, redirect to dashboard
