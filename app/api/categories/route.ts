@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/response';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { createClient } from '@supabase/supabase-js';
 
