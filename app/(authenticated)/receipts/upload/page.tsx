@@ -105,10 +105,14 @@ export default function UploadReceiptPage() {
 
       const extractResult = await extractResponse.json();
       console.log('Extraction successful:', extractResult);
-
+      
+      // Wait 2 seconds to ensure DB write completes
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setExtracting(false);
+      
       // Redirect to review page
       router.push(`/receipts/${uploadResult.receipt.id}`);
-
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
