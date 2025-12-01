@@ -43,6 +43,13 @@ export default function ReceiptDetailPage() {
   const params = useParams();
   const receiptId = params.id as string;
 
+    // ADD THIS HELPER FUNCTION HERE
+  const getExpense = (expenses: any) => {
+    if (!expenses) return null;
+    if (Array.isArray(expenses)) return expenses[0];
+    return expenses;
+  };
+
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -88,8 +95,8 @@ export default function ReceiptDetailPage() {
       setReceipt(data.receipt);
 
       // Populate form with existing data
-      if (data.receipt.expenses && data.receipt.expenses[0]) {
-        const expense = data.receipt.expenses[0];
+      const expense = getExpense(data.receipt.expenses);
+      if (expense) {
         setFormData({
           vendor_name: expense.vendor_name || '',
           amount: expense.amount?.toString() || '',
@@ -261,7 +268,7 @@ export default function ReceiptDetailPage() {
     );
   }
 
-  const expense = receipt?.expenses?.[0];
+  const expense = getExpense(receipt?.expenses);
   const imageUrl = receipt?.image_url
     ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/receipts/${receipt.image_url}`
     : null;
