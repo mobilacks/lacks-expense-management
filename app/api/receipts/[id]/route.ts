@@ -104,8 +104,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const existingExpense = existingReceipt.expenses?.[0];
-
+// Handle expenses as object or array
+const existingExpense = Array.isArray(existingReceipt.expenses) 
+  ? existingReceipt.expenses[0] 
+  : existingReceipt.expenses;
+    
     // Prepare changes object for audit log
     const changes: any = {
       before: {},
