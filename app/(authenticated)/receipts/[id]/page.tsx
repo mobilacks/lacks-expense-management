@@ -76,47 +76,65 @@ export default function ReceiptDetailPage() {
     fetchDepartments();
   }, [receiptId]);
 
-  const fetchReceipt = async (retryCount = 0) => {
-    try {
-      const res = await fetch(`/api/receipts/${receiptId}`);
-      if (!res.ok) throw new Error('Failed to fetch receipt');
-      
-      const data = await res.json();
-      
-      // If we have a receipt but no expense data, and we haven't retried too many times
-      if (data.receipt && (!data.receipt.expenses || data.receipt.expenses.length === 0) && retryCount < 5) {
-        console.log(`No expense data yet, retrying in 1.5 seconds... (attempt ${retryCount + 1}/5)`);
-        // Keep showing loading state
-        setTimeout(() => fetchReceipt(retryCount + 1), 1500); // Retry after 1.5 seconds
-        return; // Don't proceed further
+  const fetchReceipt = async (retryCount = 0, maxRetries = 8) => {
+  try {
+    const res = await fetch(`/api/receipts/${receiptId}`);
+    if (!res.ok) throw new Error('Failed to fetch receipt');
+    
+    const data = await res.json();
+    
+    console.log('Fetch attempt', retryCount + 1, '- Full response:', data);
+    console.log('Receipt expenses:', data.receipt?.expenses);
+    
+    // Helper to handle expenses (array or object)
+    const getExpenseData = (expenses: any) => {
+      if (!expenses) return null;
+      if (Array.isArray(expenses)) return expenses[0];
+      return expenses;
+    };
+    
+    const expenseData = getExpenseData(data.receipt?.expenses);
+    
+    console.log('Extracted expense data:', expenseData);
+    
+    // If we have a receipt but no expense data yet
+    if (data.receipt && !expenseData) {
+      // If we haven't exhausted retries, try again
+      if (retryCount < maxRetries) {
+        console.log(`No expense data yet, retrying in 1 second... (attempt ${retryCount + 1}/${maxRetries})`);
+        setTimeout(() => fetchReceipt(retryCount + 1, maxRetries), 1000);
+        return; // Keep loading state
+      } else {
+        // After max retries, show the page anyway (user can refresh)
+        console.log('Max retries reached, showing page anyway');
       }
-
-      // Now set the receipt
-      setReceipt(data.receipt);
-
-      // Populate form with existing data
-      const expense = getExpense(data.receipt.expenses);
-      if (expense) {
-        setFormData({
-          vendor_name: expense.vendor_name || '',
-          amount: expense.amount?.toString() || '',
-          currency: expense.currency || 'USD',
-          expense_date: expense.expense_date || '',
-          description: expense.description || '',
-          category_id: expense.category_id || '',
-          department_code_id: expense.department_code_id || ''
-        });
-      }
-
-      // Only stop loading when we're done (have data or exhausted retries)
-      setLoading(false);
-      
-    } catch (err) {
-      console.error('Error fetching receipt:', err);
-      setError('Failed to load receipt');
-      setLoading(false);
     }
-  };
+
+    // Set the receipt data
+    setReceipt(data.receipt);
+
+    // Populate form with existing data
+    if (expenseData) {
+      setFormData({
+        vendor_name: expenseData.vendor_name || '',
+        amount: expenseData.amount?.toString() || '',
+        currency: expenseData.currency || 'USD',
+        expense_date: expenseData.expense_date || '',
+        description: expenseData.description || '',
+        category_id: expenseData.category_id || '',
+        department_code_id: expenseData.department_code_id || ''
+      });
+    }
+
+    // Stop loading
+    setLoading(false);
+    
+  } catch (err) {
+    console.error('Error fetching receipt:', err);
+    setError('Failed to load receipt');
+    setLoading(false);
+  }
+};
 
   const fetchCategories = async () => {
     try {
