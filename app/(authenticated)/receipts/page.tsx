@@ -121,7 +121,10 @@ export default function ReceiptsListPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {receipts.map((receipt) => {
-              const expense = receipt.expenses?.[0];
+              // Handle expenses as object or array
+              const expense = Array.isArray(receipt.expenses) 
+                ? receipt.expenses[0] 
+                : receipt.expenses;
               const imageUrl = receipt.image_url
                 ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/receipts/${receipt.image_url}`
                 : null;
