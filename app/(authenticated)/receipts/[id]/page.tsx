@@ -71,14 +71,21 @@ export default function ReceiptDetailPage() {
     fetchDepartments();
   }, [receiptId]);
 
-  const fetchReceipt = async () => {
+  const fetchReceipt = async (retryCount = 0) => {
     try {
       const res = await fetch(`/api/receipts/${receiptId}`);
       if (!res.ok) throw new Error('Failed to fetch receipt');
       
       const data = await res.json();
       setReceipt(data.receipt);
-
+  
+      // If we have a receipt but no expense data, and we haven't retried too many times
+      if (data.receipt && (!data.receipt.expenses || data.receipt.expenses.length === 0) && retryCount < 3) {
+        console.log(`No expense data yet, retrying in 1 second... (attempt ${retryCount + 1}/3)`);
+        setTimeout(() => fetchReceipt(retryCount + 1), 1000); // Retry after 1 second
+        return; // Don't set loading to false yet
+      }
+  
       // Populate form with existing data
       if (data.receipt.expenses && data.receipt.expenses[0]) {
         const expense = data.receipt.expenses[0];
@@ -96,7 +103,10 @@ export default function ReceiptDetailPage() {
       console.error('Error fetching receipt:', err);
       setError('Failed to load receipt');
     } finally {
-      setLoading(false);
+      // Only set loading to false if we're not retrying
+      if (!retryCount || retryCount >= 3) {
+        setLoading(false);
+      }
     }
   };
 
