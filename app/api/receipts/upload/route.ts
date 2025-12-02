@@ -1,40 +1,29 @@
-// app/api/receipts/upload/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
-// Use service role client for storage operations (bypasses RLS)
-const supabaseAdmin = createClient(
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const session = await getServerSession(authOptions);
+
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userId = session.user.id;
 
-    // Get the uploaded file
+    // Parse form data
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const uploadSource = formData.get('source') as string || 'file';
+    const uploadSource = (formData.get('uploadSource') as string) || 'file';
+    const expenseReportId = formData.get('expense_report_id') as string | null; // NEW
 
     if (!file) {
       return NextResponse.json(
@@ -44,10 +33,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'application/pdf'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ];
+
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, WEBP, and PDF are allowed.' },
+        { error: 'Invalid file type. Only images and PDFs are allowed.' },
         { status: 400 }
       );
     }
@@ -59,6 +55,36 @@ export async function POST(request: NextRequest) {
         { error: 'File too large. Maximum size is 10MB.' },
         { status: 400 }
       );
+    }
+
+    // NEW: If expense_report_id provided, validate it exists and user owns it
+    if (expenseReportId) {
+      const { data: report, error: reportError } = await supabase
+        .from('expense_reports')
+        .select('id, user_id, status')
+        .eq('id', expenseReportId)
+        .single();
+
+      if (reportError || !report) {
+        return NextResponse.json(
+          { error: 'Expense report not found' },
+          { status: 404 }
+        );
+      }
+
+      if (report.user_id !== userId) {
+        return NextResponse.json(
+          { error: 'Forbidden' },
+          { status: 403 }
+        );
+      }
+
+      if (report.status !== 'draft') {
+        return NextResponse.json(
+          { error: 'Cannot add receipts to submitted report' },
+          { status: 400 }
+        );
+      }
     }
 
     // Generate receipt ID
@@ -73,6 +99,7 @@ export async function POST(request: NextRequest) {
     console.log('[Upload] Uploading file:', {
       userId,
       receiptId,
+      expenseReportId, // NEW
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
@@ -83,8 +110,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage using admin client
-    const { data: uploadData, error: uploadError } = await supabaseAdmin
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('receipts')
       .upload(filePath, buffer, {
@@ -103,22 +130,23 @@ export async function POST(request: NextRequest) {
     console.log('[Upload] ✅ File uploaded:', uploadData.path);
 
     // Get public URL for the image
-    const { data: urlData } = supabaseAdmin
+    const { data: urlData } = supabase
       .storage
       .from('receipts')
       .getPublicUrl(filePath);
 
     const imageUrl = urlData.publicUrl;
 
-    // Create receipt record in database
-    const { data: receiptData, error: receiptError } = await supabaseAdmin
+    // Create receipt record in database (with expense_report_id if provided)
+    const { data: receiptData, error: receiptError } = await supabase
       .from('receipts')
       .insert({
         id: receiptId,
         user_id: userId,
-        image_url: filePath,
+        image_url: filePath, // Store the path, not full URL
         status: 'draft',
         upload_source: uploadSource,
+        expense_report_id: expenseReportId, // NEW - Link to report
       })
       .select()
       .single();
@@ -127,7 +155,7 @@ export async function POST(request: NextRequest) {
       console.error('[Upload] Error creating receipt record:', receiptError);
       
       // Clean up uploaded file
-      await supabaseAdmin.storage.from('receipts').remove([filePath]);
+      await supabase.storage.from('receipts').remove([filePath]);
       
       return NextResponse.json(
         { error: 'Failed to create receipt record', details: receiptError.message },
@@ -143,6 +171,7 @@ export async function POST(request: NextRequest) {
         id: receiptId,
         imageUrl: imageUrl,
         imagePath: filePath,
+        expenseReportId: expenseReportId, // NEW
         uploadedAt: receiptData.uploaded_at,
       },
     });
