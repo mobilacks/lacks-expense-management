@@ -23,7 +23,12 @@ interface Receipt {
   image_url: string;
   status: string;
   uploaded_at: string;
+  expense_report_id?: string | null;  // ADD THIS LINE
   expenses: Expense[];
+  expense_reports?: {                 // ADD THESE LINES
+    id: string;
+    title: string;
+  } | null;
 }
 
 interface Category {
@@ -214,17 +219,19 @@ export default function ReceiptDetailPage() {
 
       const data = await res.json();
       
-      if (data.changes_made) {
-        setSuccessMessage('Changes saved successfully! All edits have been logged.');
+      setSuccessMessage('Changes saved successfully!');
+
+      // If receipt belongs to a report, redirect after 1.5 seconds
+      if (receipt?.expense_report_id) {
+        setTimeout(() => {
+          router.push(`/reports/${receipt.expense_report_id}`);
+        }, 1500);
       } else {
-        setSuccessMessage('No changes detected.');
+        // Refresh receipt data
+        await fetchReceipt();
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccessMessage(null), 3000);
       }
-
-      // Refresh receipt data
-      await fetchReceipt();
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000);
 
     } catch (err: any) {
       console.error('Error saving changes:', err);
@@ -296,15 +303,27 @@ export default function ReceiptDetailPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            href="/receipts"
-            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-2 mb-4"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Receipts
-          </Link>
+          {receipt?.expense_report_id && receipt?.expense_reports ? (
+              <Link
+                href={`/reports/${receipt.expense_report_id}`}
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-2 mb-4"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Report: {receipt.expense_reports.title}
+              </Link>
+            ) : (
+              <Link
+                href="/receipts"
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-2 mb-4"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Receipts
+              </Link>
+            )}
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Edit Receipt
           </h1>
@@ -326,10 +345,14 @@ export default function ReceiptDetailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               <p className="text-green-800 dark:text-green-200">{successMessage}</p>
+              {receipt?.expense_report_id && (
+                <p className="text-sm text-green-700 dark:text-green-300 ml-auto">
+                  Redirecting to report...
+                </p>
+              )}
             </div>
           </div>
         )}
-
         {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
